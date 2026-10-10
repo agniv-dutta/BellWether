@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pydantic-settings
+google-genai
+numpy
+python-multipart
+pytest
+httpx
