@@ -1,5 +1,4 @@
-import {
-  Product,
+import type {
   SearchResult,
   VisualSearchResult,
   ChatResponse,
@@ -8,7 +7,6 @@ import {
 } from './types';
 import {
   MOCK_PRODUCTS,
-  MOCK_SEARCH_RESULTS,
   MOCK_VISUAL_SEARCH_RESULTS,
   MOCK_CHAT_RESPONSES,
   MOCK_MERCHANT_ALERTS,
@@ -29,7 +27,6 @@ export function setMockMode(enabled: boolean): void {
   localStorage.setItem('bellwether_use_mocks', String(enabled));
 }
 
-// Helper for simulated delay when in mock mode
 async function mockDelay(ms = 700): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -57,19 +54,19 @@ export async function searchProducts(
     if (query) {
       const q = query.toLowerCase();
       filtered = filtered.filter(
-        p => p.name.toLowerCase().includes(q) ||
-             p.description.toLowerCase().includes(q) ||
-             p.category.toLowerCase().includes(q) ||
-             p.color.toLowerCase().includes(q)
+        (p) => p.name.toLowerCase().includes(q) ||
+               p.description.toLowerCase().includes(q) ||
+               p.category.toLowerCase().includes(q) ||
+               p.color.toLowerCase().includes(q)
       );
     }
 
     if (category) {
-      filtered = filtered.filter(p => p.category.toLowerCase() === category.toLowerCase());
+      filtered = filtered.filter((p) => p.category.toLowerCase() === category.toLowerCase());
     }
 
     if (maxPrice && maxPrice > 0) {
-      filtered = filtered.filter(p => p.price <= maxPrice);
+      filtered = filtered.filter((p) => p.price <= maxPrice);
     }
 
     return { results: filtered.slice(0, limit) };

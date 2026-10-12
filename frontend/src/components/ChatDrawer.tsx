@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { MessageCircle, X, Send, ShoppingBag } from 'lucide-react';
-import { Button } from './ui/Button';
+import { MessageCircle, X, Send } from 'lucide-react';
 import { Chip } from './ui/Chip';
 import { useSendChat } from '../hooks/useApi';
 import type { ChatMessage, Product } from '../lib/types';
@@ -24,7 +23,7 @@ export const ChatDrawer: React.FC = () => {
   const sessionId = useCallback(() => {
     let id = sessionStorage.getItem('bellwether_chat_session');
     if (!id) {
-      id = `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      id = `session-${crypto.randomUUID()}`;
       sessionStorage.setItem('bellwether_chat_session', id);
     }
     return id;
@@ -34,12 +33,12 @@ export const ChatDrawer: React.FC = () => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = (text?: string) => {
+  const handleSend = useCallback((text?: string) => {
     const message = text || input.trim();
     if (!message || sendChat.isPending) return;
 
     const userMsg: ChatMessage = {
-      id: `user-${Date.now()}`,
+      id: `user-${crypto.randomUUID()}`,
       role: 'user',
       content: message,
     };
@@ -51,7 +50,7 @@ export const ChatDrawer: React.FC = () => {
       {
         onSuccess: (data) => {
           const assistantMsg: ChatMessage = {
-            id: `assistant-${Date.now()}`,
+            id: `assistant-${crypto.randomUUID()}`,
             role: 'assistant',
             content: data.reply,
             products_mentioned: data.products_mentioned,
@@ -60,7 +59,7 @@ export const ChatDrawer: React.FC = () => {
         },
         onError: () => {
           const errorMsg: ChatMessage = {
-            id: `error-${Date.now()}`,
+            id: `error-${crypto.randomUUID()}`,
             role: 'assistant',
             content: 'I hit a snag. Could you try that again?',
           };
@@ -68,7 +67,7 @@ export const ChatDrawer: React.FC = () => {
         },
       }
     );
-  };
+  }, [input, sendChat, sessionId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

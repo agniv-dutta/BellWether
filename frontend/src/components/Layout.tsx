@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
-import { Sparkles, ShoppingBag, Store, BookOpen, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Sparkles, ShoppingBag, Store, BookOpen, RefreshCw } from 'lucide-react';
 import { getMockMode, setMockMode } from '../lib/api';
 
 export const Layout: React.FC = () => {
@@ -68,7 +68,7 @@ export const Layout: React.FC = () => {
           {/* Quick Mock Mode Indicator */}
           <button
             onClick={handleMockToggle}
-            className={`hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono transition-all border ${
+            className={`hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono transition-all border cursor-pointer ${
               isMock
                 ? 'bg-blush text-oxblood border-apricot'
                 : 'bg-hibiscus/10 text-hibiscus border-hibiscus/30'
@@ -112,7 +112,7 @@ export const Layout: React.FC = () => {
               </div>
               <button
                 onClick={handleMockToggle}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-persimmon text-paper hover:bg-coral transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-persimmon text-paper hover:bg-coral transition-colors cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>{isMock ? 'Switch to Live API' : 'Switch to Mocks'}</span>

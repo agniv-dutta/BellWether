@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion, type Variants } from 'framer-motion';
 import { Upload, Search, X, Image as ImageIcon, Loader2, AlertTriangle, Frown, RefreshCw } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Chip } from '../components/ui/Chip';
@@ -11,7 +11,7 @@ import { ChatDrawer } from '../components/ChatDrawer';
 import { useSearchProducts, useVisualSearch } from '../hooks/useApi';
 import type { Product } from '../lib/types';
 
-const fadeInUp = {
+const fadeInUp: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100, damping: 20 } },
 };

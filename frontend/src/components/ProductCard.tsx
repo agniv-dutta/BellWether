@@ -1,5 +1,5 @@
 import React from 'react';
-import { Product } from '../lib/types';
+import type { Product } from '../lib/types';
 import { ArchFrame } from './ui/ArchFrame';
 import { Chip } from './ui/Chip';
 

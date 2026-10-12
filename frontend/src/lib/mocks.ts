@@ -1,4 +1,4 @@
-import { Product, SearchResult, VisualSearchResult, ChatResponse, MerchantAskResponse, MerchantAlertsResponse } from './types';
+import type { Product, SearchResult, VisualSearchResult, ChatResponse, MerchantAskResponse, MerchantAlertsResponse } from './types';
 
 export const MOCK_PRODUCTS: Product[] = [
   {
@@ -17,7 +17,7 @@ export const MOCK_PRODUCTS: Product[] = [
     id: "prod-002",
     name: "Raw Linen Relaxed Kurta",
     category: "Apparel",
-    description: "Breathable unbleached organic linen shirt with coconut shell buttons and tailored mandarain collar.",
+    description: "Breathable unbleached organic linen shirt with coconut shell buttons and tailored mandarin collar.",
     price: 4200,
     color: "Apricot Cream",
     image_url: "https://images.unsplash.com/photo-1598033129183-c4f50c736f10?auto=format&fit=crop&w=800&q=80",
@@ -190,25 +190,25 @@ export const MOCK_CHAT_RESPONSES: Record<string, ChatResponse> = {
 export const MOCK_MERCHANT_ALERTS: MerchantAlertsResponse = {
   alerts: [
     {
-      product: MOCK_PRODUCTS[0], // Chanderi Silk Saree
+      product: MOCK_PRODUCTS[0],
       stock: 4,
       velocity: 3.2,
       recommendation: "Stock running critically low (4 remaining). Demand surged 45% following sunset wedding season feature. Reorder 15 units from Chanderi weavers immediately."
     },
     {
-      product: MOCK_PRODUCTS[5], // Terracotta Chai Kulhar
+      product: MOCK_PRODUCTS[5],
       stock: 2,
       velocity: 4.8,
       recommendation: "Only 2 units in inventory. Highly viral item with 4.8 daily sales velocity. Reorder batch of 50."
     },
     {
-      product: MOCK_PRODUCTS[2], // Brass Urli Bowl
+      product: MOCK_PRODUCTS[2],
       stock: 3,
       velocity: 1.5,
       recommendation: "3 units remaining. Lead time for Moradabad brass artisans is 12 days. Place replenishment request today."
     },
     {
-      product: MOCK_PRODUCTS[11], // Meenakari Earrings
+      product: MOCK_PRODUCTS[11],
       stock: 3,
       velocity: 2.1,
       recommendation: "3 pairs left. High search-to-cart conversion rate (28%). Increase safety stock threshold."
