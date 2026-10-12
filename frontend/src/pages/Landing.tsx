@@ -67,7 +67,7 @@ export const Landing: React.FC = () => {
               variants={fadeInUp}
               className="inline-block font-mono text-xs uppercase tracking-[0.2em] text-hibiscus bg-hibiscus/10 px-4 py-1.5 rounded-full border border-hibiscus/20"
             >
-              Jauhari / जौहरी
+              BellWether
             </motion.span>
 
             <motion.h1

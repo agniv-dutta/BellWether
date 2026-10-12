@@ -36,7 +36,7 @@ export const Layout: React.FC = () => {
                 BellWether
               </span>
               <span className="font-mono text-[10px] text-hibiscus tracking-wider">
-                JAUHARI AI
+                BellWether
               </span>
             </div>
           </Link>

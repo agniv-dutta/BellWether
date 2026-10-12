@@ -156,7 +156,7 @@ export const ProblemStory: React.FC = () => {
               className="md:hidden w-0.5 h-12 bg-gradient-to-b from-apricot to-persimmon"
             />
 
-            {/* Center Node — Jauhari */}
+            {/* Center Node — BellWether */}
             <motion.div variants={fadeInUp} className="flex flex-col items-center z-10">
               <div className="arch bg-gradient-to-b from-persimmon to-vermilion border-2 border-coral/60 px-10 pt-12 pb-8 shadow-oxblood-lg text-center min-w-[200px]">
                 <span className="font-serif text-3xl text-paper font-bold">BellWether</span>
