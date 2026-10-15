@@ -11,7 +11,8 @@ class FakeSearchService:
     """Returns a fixed result set, never touching Gemini."""
 
     def semantic_search(
-        self, query, top_k=10, category=None, max_price=None, min_price=None
+        self, query, top_k=10, category=None, max_price=None, min_price=None,
+        persona_id=None,
     ):
         return [
             ScoredProduct(
@@ -56,10 +57,12 @@ def test_search_applies_filters(client):
 
     class RecordingService(FakeSearchService):
         def semantic_search(
-            self, query, top_k=10, category=None, max_price=None, min_price=None
+            self, query, top_k=10, category=None, max_price=None, min_price=None,
+            persona_id=None,
         ):
             seen.update(
-                top_k=top_k, category=category, max_price=max_price, min_price=min_price
+                top_k=top_k, category=category, max_price=max_price,
+                min_price=min_price, persona_id=persona_id,
             )
             return super().semantic_search(query, top_k=top_k)
 

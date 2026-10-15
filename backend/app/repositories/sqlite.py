@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-from app.models.product import Product, SalesRecord
+from app.models.product import Customer, Persona, Product, SalesRecord, SearchEvent
 from app.repositories.base import ProductRepository, SalesRepository
 
 _SCHEMA = """
@@ -37,11 +37,40 @@ CREATE TABLE IF NOT EXISTS sales (
     quantity   INTEGER NOT NULL,
     sale_date  TEXT    NOT NULL,
     revenue    REAL    NOT NULL,
+    order_id   INTEGER,
     FOREIGN KEY (product_id) REFERENCES products(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_sales_product ON sales(product_id);
 CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(sale_date);
+CREATE INDEX IF NOT EXISTS idx_sales_order ON sales(order_id);
+
+CREATE TABLE IF NOT EXISTS customers (
+    id      INTEGER PRIMARY KEY,
+    name    TEXT NOT NULL,
+    persona TEXT NOT NULL DEFAULT '',
+    city    TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS personas (
+    id                TEXT PRIMARY KEY,
+    name              TEXT NOT NULL,
+    category_affinity TEXT NOT NULL DEFAULT '{}',
+    price_min         REAL NOT NULL DEFAULT 0,
+    price_max         REAL NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS search_events (
+    id           INTEGER PRIMARY KEY,
+    ts           TEXT NOT NULL,
+    query        TEXT NOT NULL,
+    mode         TEXT NOT NULL DEFAULT 'text',
+    result_count INTEGER NOT NULL DEFAULT 0,
+    top_score    REAL NOT NULL DEFAULT 0,
+    persona_id   TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_ts ON search_events(ts);
 """
 
 
@@ -217,26 +246,29 @@ class SqliteSalesRepository(_SqliteMixin, SalesRepository):
 
     @staticmethod
     def _row_to_record(row: sqlite3.Row) -> SalesRecord:
+        columns = row.keys()
         return SalesRecord(
             id=row["id"],
             product_id=row["product_id"],
             quantity=row["quantity"],
             sale_date=date.fromisoformat(row["sale_date"]),
             revenue=row["revenue"],
+            order_id=row["order_id"] if "order_id" in columns else None,
         )
 
     def add(self, record: SalesRecord) -> SalesRecord:
         with self._connect() as conn:
             cur = conn.execute(
                 """
-                INSERT INTO sales (product_id, quantity, sale_date, revenue)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO sales (product_id, quantity, sale_date, revenue, order_id)
+                VALUES (?, ?, ?, ?, ?)
                 """,
                 (
                     record.product_id,
                     record.quantity,
                     record.sale_date.isoformat(),
                     record.revenue,
+                    record.order_id,
                 ),
             )
             conn.commit()
@@ -245,14 +277,20 @@ class SqliteSalesRepository(_SqliteMixin, SalesRepository):
 
     def add_many(self, records: list[SalesRecord]) -> int:
         rows = [
-            (r.product_id, r.quantity, r.sale_date.isoformat(), r.revenue)
+            (
+                r.product_id,
+                r.quantity,
+                r.sale_date.isoformat(),
+                r.revenue,
+                r.order_id,
+            )
             for r in records
         ]
         with self._connect() as conn:
             conn.executemany(
                 """
-                INSERT INTO sales (product_id, quantity, sale_date, revenue)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO sales (product_id, quantity, sale_date, revenue, order_id)
+                VALUES (?, ?, ?, ?, ?)
                 """,
                 rows,
             )
@@ -294,12 +332,189 @@ class SqliteSalesRepository(_SqliteMixin, SalesRepository):
         with self._connect() as conn:
             return int(conn.execute("SELECT COUNT(*) FROM sales").fetchone()[0])
 
+    def baskets(self) -> list[list[int]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT order_id, product_id FROM sales
+                WHERE order_id IS NOT NULL ORDER BY order_id
+                """
+            ).fetchall()
+        grouped: dict[int, list[int]] = {}
+        for row in rows:
+            grouped.setdefault(int(row["order_id"]), []).append(int(row["product_id"]))
+        return [sorted(set(items)) for items in grouped.values() if len(items) > 1]
+
+
+class SqliteCustomerRepository(_SqliteMixin):
+    """SQLite-backed access to customers."""
+
+    def add_many(self, customers: list[Customer]) -> int:
+        with self._connect() as conn:
+            conn.executemany(
+                "INSERT INTO customers (name, persona, city) VALUES (?, ?, ?)",
+                [(c.name, c.persona, c.city) for c in customers],
+            )
+            conn.commit()
+        return len(customers)
+
+    def count(self) -> int:
+        with self._connect() as conn:
+            return int(conn.execute("SELECT COUNT(*) FROM customers").fetchone()[0])
+
+
+class SqlitePersonaRepository(_SqliteMixin):
+    """SQLite-backed access to shopper personas."""
+
+    @staticmethod
+    def _row_to_persona(row: sqlite3.Row) -> Persona:
+        try:
+            affinity = json.loads(row["category_affinity"] or "{}")
+        except (TypeError, ValueError):
+            affinity = {}
+        return Persona(
+            id=row["id"],
+            name=row["name"],
+            category_affinity={k: float(v) for k, v in affinity.items()},
+            price_min=row["price_min"],
+            price_max=row["price_max"],
+        )
+
+    def upsert(self, persona: Persona) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO personas (id, name, category_affinity, price_min, price_max)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    name = excluded.name,
+                    category_affinity = excluded.category_affinity,
+                    price_min = excluded.price_min,
+                    price_max = excluded.price_max
+                """,
+                (
+                    persona.id,
+                    persona.name,
+                    json.dumps(persona.category_affinity),
+                    persona.price_min,
+                    persona.price_max,
+                ),
+            )
+            conn.commit()
+
+    def get(self, persona_id: str) -> Optional[Persona]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM personas WHERE id = ?", (persona_id,)
+            ).fetchone()
+        return self._row_to_persona(row) if row else None
+
+    def list(self) -> list[Persona]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM personas ORDER BY id").fetchall()
+        return [self._row_to_persona(r) for r in rows]
+
+
+class SqliteSearchEventRepository(_SqliteMixin):
+    """SQLite-backed access to logged shopper search events."""
+
+    def log(
+        self,
+        query: str,
+        mode: str,
+        result_count: int,
+        top_score: float,
+        persona_id: str = "",
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO search_events (ts, query, mode, result_count, top_score, persona_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    datetime.now(timezone.utc).isoformat(),
+                    query.strip()[:300],
+                    mode,
+                    result_count,
+                    top_score,
+                    persona_id or "",
+                ),
+            )
+            conn.commit()
+
+    def misses_since(
+        self, days: int, threshold: float, limit: int = 200
+    ) -> list[SearchEvent]:
+        """Return recent miss queries (no results or weak top score)."""
+        from datetime import timedelta
+
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(days=days)
+        ).isoformat()
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM search_events
+                WHERE ts >= ? AND (result_count = 0 OR top_score < ?)
+                ORDER BY ts DESC LIMIT ?
+                """,
+                (cutoff, threshold, limit),
+            ).fetchall()
+        return [
+            SearchEvent(
+                id=r["id"],
+                ts=r["ts"],
+                query=r["query"],
+                mode=r["mode"],
+                result_count=r["result_count"],
+                top_score=r["top_score"],
+                persona_id=r["persona_id"],
+            )
+            for r in rows
+        ]
+
+    def unmet_count_since(self, days: int, threshold: float) -> int:
+        from datetime import timedelta
+
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(days=days)
+        ).isoformat()
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT COUNT(*) FROM search_events
+                WHERE ts >= ? AND (result_count = 0 OR top_score < ?)
+                """,
+                (cutoff, threshold),
+            ).fetchone()
+        return int(row[0])
+
 
 def init_db(db_path: str) -> None:
-    """Create the schema if it does not already exist."""
+    """Create the schema if it does not already exist.
+
+    Also migrates databases created before ``order_id`` and the newer tables
+    existed, so a re-seed is convenient but never mandatory.
+    """
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     try:
+        # Migrate first: databases created before ``order_id`` existed must gain
+        # the column before the schema script builds an index on it.
+        tables = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+        if "sales" in tables:
+            sales_columns = {
+                row[1]
+                for row in conn.execute("PRAGMA table_info(sales)").fetchall()
+            }
+            if "order_id" not in sales_columns:
+                conn.execute("ALTER TABLE sales ADD COLUMN order_id INTEGER")
         conn.executescript(_SCHEMA)
         conn.commit()
     finally:

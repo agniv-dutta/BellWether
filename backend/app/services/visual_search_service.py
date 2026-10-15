@@ -31,12 +31,16 @@ _EXPLAIN_SYSTEM = (
 
 
 class StyleAttributes(BaseModel):
-    """Structured style attributes extracted from an image."""
+    """Structured style attributes extracted from an image.
+
+    Keys mirror the frontend contract: ``color`` is a single string and
+    ``style`` is a list of descriptors.
+    """
 
     category: str = Field(..., description="Best-matching product category.")
-    colors: list[str] = Field(default_factory=list, description="Dominant colors.")
-    style_keywords: list[str] = Field(
-        default_factory=list, description="Style descriptors, e.g. minimalist."
+    color: str = Field("", description="Dominant color, e.g. 'terracotta'.")
+    style: list[str] = Field(
+        default_factory=list, description="Style descriptors, e.g. handloom."
     )
     material: str = Field("", description="Apparent material, if any.")
     occasion: str = Field("", description="Likely occasion / use.")
@@ -76,10 +80,9 @@ class VisualSearchService:
         hint: Optional[str] = None,
     ) -> StyleAttributes:
         prompt = (
-            "Analyse this product image and extract its style attributes. "
-            "Choose the single best-fitting category (for example: Women's Tops, "
-            "Men's Shirts, Dresses, Denim, Outerwear, Shoes, Bags, Accessories, "
-            "Home Decor, Kitchen, Bedding, Lighting, Rugs)."
+            "Analyse this product image from a general retail store and "
+            "extract its style attributes. Choose the single best-fitting category "
+            "(one of: Apparel, Footwear, Home & Living, Beauty, Kitchen, Accessories)."
         )
         if hint:
             prompt += f"\nThe shopper also added this hint: {hint}"
@@ -98,8 +101,8 @@ class VisualSearchService:
             attributes.category,
             attributes.material,
             attributes.occasion,
-            " ".join(attributes.colors),
-            " ".join(attributes.style_keywords),
+            attributes.color,
+            " ".join(attributes.style),
         ]
         query = " ".join(part for part in parts if part).strip()
         return query or "product"
@@ -138,10 +141,11 @@ class VisualSearchService:
         mime_type: str,
         hint: Optional[str] = None,
         limit: int = 10,
+        persona_id: Optional[str] = None,
     ) -> VisualSearchResult:
         attributes = self.extract_attributes(image_bytes, mime_type, hint=hint)
         results = self.search.semantic_search(
-            self.build_query(attributes), top_k=limit
+            self.build_query(attributes), top_k=limit, persona_id=persona_id
         )
         try:
             explanations = self.explain_matches(attributes, results)

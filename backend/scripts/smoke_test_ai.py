@@ -1,11 +1,11 @@
-"""Smoke test for the Vertex AI integration.
+"""Smoke test for the Gemini API integration.
 
-Calls each Gemini wrapper method once and prints the results. Run this after
-configuring ADC and billing::
+Calls each Gemini wrapper method once and prints the results. Requires a
+``GEMINI_API_KEY`` (see ``.env.example``)::
 
     python scripts/smoke_test_ai.py
 
-If this passes, your auth, APIs, and billing are set up correctly.
+If this passes, your API key and model access are working correctly.
 """
 
 from __future__ import annotations
@@ -29,8 +29,8 @@ class Widget(BaseModel):
 
 
 def main() -> None:
-    print(f"Project : {settings.project}")
-    print(f"Location: {settings.location}")
+    print(f"Provider: Gemini API")
+    print(f"API key : {'set' if settings.api_key_configured else 'MISSING'}")
     print(f"Chat    : {settings.gemini_model}")
     print(f"Embed   : {settings.embedding_model}")
     print("-" * 60)
@@ -47,8 +47,8 @@ def main() -> None:
 
     print("[2/3] generate_json ...")
     widget = service.generate_json(
-        "Invent a single product for an online store with a name, color, "
-        "price in USD, and 3 tags.",
+        "Invent a single product for an Indian artisanal online store with a name, "
+        "color, price in Indian rupees (INR), and 3 tags.",
         Widget,
     )
     print("   ->", widget.model_dump())

@@ -49,6 +49,25 @@
     border-radius: 999px 999px 16px 16px;
   }
 
+  /* Warm grade for all product photography so off-palette colours
+     in photos never break the palette. Apply to every product img. */
+  .photo-warm {
+    filter: saturate(0.92);
+  }
+  .photo-warm-wrap {
+    position: relative;
+  }
+  .photo-warm-wrap::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-color: #FFB690;
+    opacity: 0.12;
+    mix-blend-mode: multiply;
+    border-radius: inherit;
+  }
+
   .text-display {
     font-family: "Fraunces", Georgia, serif;
     font-variation-settings: "SOFT" 100, "opsz" 144;
@@ -63,6 +82,10 @@
 
 .animate-marquee {
   animation: marquee 25s linear infinite;
+}
+
+html {
+  scroll-padding-top: 88px;
 }
 
 body {

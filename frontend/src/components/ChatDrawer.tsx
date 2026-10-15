@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useImperativeHandle } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { MessageCircle, X, Send } from 'lucide-react';
 import { Chip } from './ui/Chip';
@@ -8,16 +8,50 @@ import type { ChatMessage, Product } from '../lib/types';
 const STARTER_SUGGESTIONS = [
   'Show me something for a sunset wedding',
   'I want earthy tones and handloom textures',
-  'What pairs well with a terracotta saree?',
+  'What pairs well with a linen shirt?',
 ];
 
-export const ChatDrawer: React.FC = () => {
+// Safety net: the assistant should reply in plain text, but if any markdown
+// slips through (e.g. **bold**), strip it so raw symbols never reach the UI.
+function cleanReply(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/~~(.+?)~~/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+export interface ChatDrawerProps {
+  personaId?: string;
+  handleRef?: React.RefObject<ChatDrawerHandle | null>;
+}
+
+export interface ChatDrawerHandle {
+  openAndFocus: () => void;
+}
+
+export const ChatDrawer: React.FC<ChatDrawerProps> = ({ personaId = '', handleRef }) => {
   const prefersReduced = useReducedMotion();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const sendChat = useSendChat();
+
+  // The Shopper "Ask" tab opens the drawer via this handle (event-driven).
+  useImperativeHandle(
+    handleRef,
+    () => ({
+      openAndFocus: () => {
+        setIsOpen(true);
+        window.setTimeout(() => inputRef.current?.focus(), 350);
+      },
+    }),
+    []
+  );
 
   // Session ID persistence
   const sessionId = useCallback(() => {
@@ -46,7 +80,7 @@ export const ChatDrawer: React.FC = () => {
     setInput('');
 
     sendChat.mutate(
-      { sessionId: sessionId(), message },
+      { sessionId: sessionId(), message, personaId },
       {
         onSuccess: (data) => {
           const assistantMsg: ChatMessage = {
@@ -67,7 +101,7 @@ export const ChatDrawer: React.FC = () => {
         },
       }
     );
-  }, [input, sendChat, sessionId]);
+  }, [input, sendChat, sessionId, personaId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -156,7 +190,7 @@ export const ChatDrawer: React.FC = () => {
                         : 'bg-blush/70 text-oxblood rounded-bl-lg'
                     }`}
                   >
-                    <p>{msg.content}</p>
+                    <p className="whitespace-pre-wrap">{cleanReply(msg.content)}</p>
 
                     {/* Products Mentioned */}
                     {msg.products_mentioned && msg.products_mentioned.length > 0 && (
@@ -169,7 +203,7 @@ export const ChatDrawer: React.FC = () => {
                             <div className="arch-sm overflow-hidden aspect-square bg-blush">
                               <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
                             </div>
-                            <p className="text-[11px] font-medium text-oxblood line-clamp-1">{p.name}</p>
+                            <p className="text-[11px] font-medium text-oxblood line-clamp-1" title={p.name}>{p.name}</p>
                             <p className="text-[11px] font-serif font-bold text-oxblood">₹{p.price.toLocaleString('en-IN')}</p>
                           </div>
                         ))}
@@ -202,6 +236,7 @@ export const ChatDrawer: React.FC = () => {
             <div className="px-4 py-3 border-t border-blush bg-paper">
               <div className="flex items-center gap-2">
                 <input
+                  ref={inputRef}
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}

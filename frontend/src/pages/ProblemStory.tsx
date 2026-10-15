@@ -81,7 +81,7 @@ export const ProblemStory: React.FC = () => {
                   {[
                     'Search for "something like this photo" — and get a keyword-empty results page.',
                     'Describe a "warm linen shirt, not too fitted" — and the filter menu offers S / M / L.',
-                    'Abandon their cart because zero results for "earrings for a quiet wedding" sounds like a dead end.',
+                    'Abandon their cart because zero results for "a lamp for a small reading corner" sounds like a dead end.',
                   ].map((point, i) => (
                     <li key={i} className="flex gap-3 text-oxblood/80 text-sm leading-relaxed">
                       <span className="w-6 h-6 rounded-full bg-persimmon/15 text-persimmon flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
@@ -185,6 +185,67 @@ export const ProblemStory: React.FC = () => {
         </div>
       </section>
 
+      {/* =========== WHERE THE MARKET IS =========== */}
+      <section className="py-20 sm:py-28 px-6 bg-paper border-t border-oxblood/10">
+        <div className="max-w-6xl mx-auto">
+          <SectionHeading
+            eyebrow="Where the market is"
+            title="Everyone picks a side."
+            subtitle="Today's assistants answer shoppers or help merchants. BellWether does both, and the shopper's unmet demand becomes the merchant's next stocking decision."
+            align="center"
+            className="mb-14"
+          />
+
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.2 }}
+            variants={stagger}
+            className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4"
+          >
+            {[
+              { name: 'Amazon', product: 'Rufus → Alexa for Shopping', does: 'Shopper-side assistant inside Amazon.', gap: 'Locked to Amazon\u2019s catalog.' },
+              { name: 'Walmart', product: 'Sparky', does: 'Shopper-side assistant with higher baskets.', gap: 'Shopper-side only.' },
+              { name: 'Shopify', product: 'Sidekick', does: 'Merchant-side natural-language analytics.', gap: 'Separate product, Shopify-only.' },
+              { name: 'Google Cloud', product: 'Vertex AI Search for commerce', does: 'Enterprise search and agents.', gap: 'Infrastructure, not a connected product.' },
+            ].map((player) => (
+              <motion.div key={player.name} variants={fadeInUp}>
+                <Card variant="paper" className="h-full p-6 space-y-3">
+                  <p className="font-mono text-xs uppercase tracking-wider text-oxblood/50">{player.name}</p>
+                  <h3 className="font-serif text-lg text-oxblood leading-snug">{player.product}</h3>
+                  <p className="text-xs text-oxblood/75 leading-relaxed">{player.does}</p>
+                  <p className="text-xs text-vermilion/90 leading-relaxed border-t border-blush pt-3">{player.gap}</p>
+                </Card>
+              </motion.div>
+            ))}
+          </motion.div>
+
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.5 }}
+            variants={fadeInUp}
+            className="mt-6"
+          >
+            <Card variant="blush" className="p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <span className="font-serif text-2xl text-oxblood shrink-0">BellWether</span>
+              <p className="text-sm text-oxblood/80 leading-relaxed">
+                Rufus for shoppers and Sidekick for merchants, built as one loop — for
+                retailers who can build neither. Closes the loop between both sides:
+                unmet demand becomes the next stocking decision.
+              </p>
+              <span className="shrink-0 text-xs font-mono font-bold bg-persimmon text-paper px-3 py-1.5 rounded-full">
+                Closes the loop ✓
+              </span>
+            </Card>
+          </motion.div>
+
+          <p className="mt-6 text-center text-[11px] font-mono text-oxblood/50">
+            Competitor details as of Oct 2026, from public sources.
+          </p>
+        </div>
+      </section>
+
       {/* =========== IMPACT =========== */}
       <section className="bg-blush/40 py-20 sm:py-28 px-6">
         <div className="max-w-5xl mx-auto">
@@ -239,7 +300,7 @@ export const ProblemStory: React.FC = () => {
             className="flex flex-wrap justify-center gap-3 pt-4"
           >
             {[
-              { label: 'Gemini on Vertex AI', icon: <Cpu className="w-3.5 h-3.5" /> },
+              { label: 'Gemini API', icon: <Cpu className="w-3.5 h-3.5" /> },
               { label: 'Embeddings API', icon: <Boxes className="w-3.5 h-3.5" /> },
               { label: 'Cloud Run', icon: <Cloud className="w-3.5 h-3.5" /> },
               { label: 'BigQuery', icon: <Database className="w-3.5 h-3.5" /> },

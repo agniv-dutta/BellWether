@@ -74,3 +74,7 @@ class SalesRepository(ABC):
     @abstractmethod
     def count(self) -> int:
         """Return the number of sales records."""
+
+    @abstractmethod
+    def baskets(self) -> list[list[int]]:
+        """Return order baskets as lists of product ids (for affinity)."""

@@ -6,8 +6,9 @@ def test_health_ok(client):
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
-    assert "project" in body
-    assert "chat_model" in body
+    assert body["backend"] in ("api", "vertex")
+    assert "model" in body
+    assert "latency_ms" in body
 
 
 def test_health_returns_json(client):

@@ -20,8 +20,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import settings  # noqa: E402
-from app.models.product import Product, SalesRecord  # noqa: E402
+from app.models.product import Customer, Persona, Product, SalesRecord  # noqa: E402
 from app.repositories.sqlite import (  # noqa: E402
+    SqliteCustomerRepository,
+    SqlitePersonaRepository,
     SqliteProductRepository,
     SqliteSalesRepository,
     init_db,
@@ -35,100 +37,151 @@ HOT_PRODUCT_COUNT = 18
 DAYS_OF_HISTORY = 90
 
 COLORS = [
-    "Black", "White", "Navy", "Beige", "Olive", "Burgundy", "Grey",
-    "Charcoal", "Cream", "Rust", "Sage", "Camel", "Blush", "Cobalt",
-    "Bottle Green", "Chocolate", "Lavender", "Sand", "Terracotta", "Mocha",
+    "Terracotta", "Madder Red", "Deep Rust", "Coral", "Hibiscus Pink",
+    "Peach Blush", "Vermilion", "Oxblood", "Sandstone Pink", "Ivory",
+    "Natural Beige", "Henna", "Rosewood", "Wine", "Almond", "Cocoa",
+    "Warm Brass", "Mustard", "Marigold", "Turmeric", "Ochre", "Indigo",
+]
+
+PERSONAS: list[dict] = [
+    {
+        "id": "aarav",
+        "name": "Aarav · Streetwear",
+        "category_affinity": {"Footwear": 1.0, "Apparel": 0.8, "Accessories": 0.6},
+        "price_min": 800,
+        "price_max": 5000,
+    },
+    {
+        "id": "meera",
+        "name": "Meera · Minimal home",
+        "category_affinity": {"Home & Living": 1.0, "Kitchen": 0.7, "Beauty": 0.4},
+        "price_min": 1500,
+        "price_max": 10000,
+    },
+    {
+        "id": "riya",
+        "name": "Riya · Budget-first",
+        "category_affinity": {
+            "Accessories": 0.5, "Beauty": 0.5, "Kitchen": 0.5,
+            "Apparel": 0.4, "Footwear": 0.3, "Home & Living": 0.3,
+        },
+        "price_min": 0,
+        "price_max": 1500,
+    },
+]
+
+CUSTOMER_NAMES = [
+    "Aarav Mehta", "Meera Iyer", "Riya Sharma", "Kabir Rao", "Anaya Gupta",
+    "Vikram Nair", "Diya Patel", "Arjun Malhotra", "Ishita Bose", "Rohan Verma",
+    "Sneha Kulkarni", "Aditya Rao", "Priya Nambiar", "Karan Joshi", "Nisha Reddy",
+    "Varun Menon", "Pooja Agarwal", "Nikhil Shah", "Kavya Menon", "Sahil Khan",
+]
+
+CUSTOMER_CITIES = [
+    "Mumbai", "Delhi", "Bengaluru", "Jaipur", "Pune",
+    "Hyderabad", "Chennai", "Kolkata", "Ahmedabad", "Kochi",
 ]
 
 # category -> (items, materials, (price_low, price_high), occasions)
+# General retail across six categories; INR prices between 299 and 6999.
 CATALOG: dict[str, dict] = {
-    "Women's Tops": {
-        "items": ["Blouse", "T-Shirt", "Tank Top", "Sweater", "Cardigan", "Bodysuit"],
-        "materials": ["Cotton", "Linen", "Silk", "Ribbed Knit", "Chiffon"],
-        "price": (15, 60),
-        "occasions": ["everyday", "office", "evening out"],
+    "Apparel": {
+        "items": ["Linen Shirt", "Relaxed Trousers", "Co-ord Set", "Denim Jacket", "Summer Dress", "Knit Sweater"],
+        "materials": ["Linen", "Cotton", "Denim", "Knit", "Canvas"],
+        "price": (499, 2499),
+        "occasions": ["everyday wear", "weekend", "work", "winter layering"],
     },
-    "Men's Shirts": {
-        "items": ["Oxford Shirt", "Flannel Shirt", "Polo Shirt", "Henley", "Overshirt"],
-        "materials": ["Cotton", "Linen", "Chambray", "Corduroy", "Twill"],
-        "price": (20, 75),
-        "occasions": ["everyday", "office", "weekend"],
+    "Footwear": {
+        "items": ["Everyday Sneakers", "Running Shoes", "Leather Loafers", "Canvas Slip-ons", "Strappy Sandals", "Ankle Boots"],
+        "materials": ["Canvas", "Leather", "Mesh", "Suede"],
+        "price": (899, 3499),
+        "occasions": ["everyday", "travel", "weekend", "work"],
     },
-    "Dresses": {
-        "items": ["Midi Dress", "Maxi Dress", "Wrap Dress", "Slip Dress", "Shirt Dress"],
-        "materials": ["Satin", "Cotton", "Linen", "Jersey", "Crepe"],
-        "price": (30, 120),
-        "occasions": ["wedding guest", "summer", "evening", "office"],
+    "Home & Living": {
+        "items": ["Ceramic Table Lamp", "Throw Blanket", "Cushion Cover", "Wall Mirror", "Scented Candle Set", "Cotton Dhurrie"],
+        "materials": ["Ceramic", "Cotton", "Brass", "Glass", "Soy Wax"],
+        "price": (499, 3999),
+        "occasions": ["reading corner", "living room", "gifting", "housewarming"],
     },
-    "Denim": {
-        "items": ["Straight Jeans", "Skinny Jeans", "Wide-Leg Jeans", "Denim Jacket", "Shorts"],
-        "materials": ["Rigid Denim", "Stretch Denim", "Selvedge Denim"],
-        "price": (40, 110),
-        "occasions": ["everyday", "weekend", "concert"],
-    },
-    "Outerwear": {
-        "items": ["Trench Coat", "Puffer Jacket", "Wool Coat", "Bomber Jacket", "Parka"],
-        "materials": ["Wool", "Nylon", "Cotton Twill", "Down", "Polyester"],
-        "price": (60, 220),
-        "occasions": ["winter", "rainy days", "commuting"],
-    },
-    "Shoes": {
-        "items": ["Sneakers", "Loafers", "Chelsea Boots", "Heeled Sandals", "Ballet Flats"],
-        "materials": ["Leather", "Suede", "Canvas", "Vegan Leather"],
-        "price": (35, 160),
-        "occasions": ["everyday", "office", "evening"],
-    },
-    "Bags": {
-        "items": ["Tote Bag", "Crossbody Bag", "Shoulder Bag", "Backpack", "Clutch"],
-        "materials": ["Leather", "Canvas", "Suede", "Nylon"],
-        "price": (30, 190),
-        "occasions": ["everyday", "travel", "evening"],
-    },
-    "Accessories": {
-        "items": ["Silk Scarf", "Leather Belt", "Sunglasses", "Beanie", "Wool Socks"],
-        "materials": ["Silk", "Leather", "Acetate", "Merino Wool"],
-        "price": (10, 65),
-        "occasions": ["everyday", "gifting", "winter"],
-    },
-    "Home Decor": {
-        "items": ["Ceramic Vase", "Wall Mirror", "Picture Frame", "Candle Holder", "Sculpture"],
-        "materials": ["Ceramic", "Brass", "Oak", "Marble", "Rattan"],
-        "price": (15, 90),
-        "occasions": ["gifting", "living room", "housewarming"],
+    "Beauty": {
+        "items": ["Skincare Set", "Face Serum", "Bath Salt Trio", "Hand Cream Duo", "Clay Mask Kit", "Lip Balm Set"],
+        "materials": ["Vitamin C", "Shea Butter", "Kaolin Clay", "Hyaluronic", "Almond Oil"],
+        "price": (299, 1799),
+        "occasions": ["daily ritual", "gifting", "winter care", "self-care Sunday"],
     },
     "Kitchen": {
-        "items": ["Mug Set", "Cast Iron Pan", "Serving Board", "Mixing Bowls", "Kettle"],
-        "materials": ["Stoneware", "Cast Iron", "Acacia", "Bamboo", "Enamel"],
-        "price": (12, 70),
-        "occasions": ["gifting", "everyday cooking", "brunch"],
+        "items": ["Serving Tray", "Chai Kulhar Set", "Copper Bottle", "Dinner Plates", "Storage Jar Set", "Cast Iron Skillet"],
+        "materials": ["Terracotta", "Copper", "Stoneware", "Sheesham Wood", "Cast Iron"],
+        "price": (399, 2499),
+        "occasions": ["daily rituals", "festive hosting", "gifting", "brunch"],
     },
-    "Bedding": {
-        "items": ["Duvet Cover", "Sheet Set", "Pillowcase Pair", "Throw Blanket", "Quilt"],
-        "materials": ["Cotton Percale", "Linen", "Bamboo", "Flannel", "Waffle Weave"],
-        "price": (25, 150),
-        "occasions": ["bedroom refresh", "gifting", "winter"],
-    },
-    "Lighting": {
-        "items": ["Table Lamp", "Floor Lamp", "Pendant Light", "Wall Sconce", "String Lights"],
-        "materials": ["Brass", "Ceramic", "Rattan", "Glass", "Linen Shade"],
-        "price": (20, 130),
-        "occasions": ["living room", "bedroom", "mood lighting"],
-    },
-    "Rugs": {
-        "items": ["Area Rug", "Runner Rug", "Jute Rug", "Shag Rug", "Wool Rug"],
-        "materials": ["Jute", "Wool", "Cotton", "Polypropylene", "Viscose"],
-        "price": (40, 210),
-        "occasions": ["living room", "bedroom", "hallway"],
+    "Accessories": {
+        "items": ["Canvas Tote", "Leather Belt", "Silk Scarf", "Sunglasses", "Cotton Cap", "Day Backpack"],
+        "materials": ["Canvas", "Leather", "Silk", "Acetate"],
+        "price": (299, 2499),
+        "occasions": ["everyday", "travel", "gifting", "weekend"],
     },
 }
 
 
 def _description(color: str, material: str, item: str, occasion: str) -> str:
     return (
-        f"A {color.lower()} {material.lower()} {item.lower()} designed for {occasion}. "
-        f"Thoughtfully made with quality materials and an easy, versatile fit that "
-        f"works across the season."
+        f"A {color.lower()} {item.lower()} in {material.lower()}, made for {occasion}. "
+        f"An easy, well-made staple with a warm hand-finished feel."
     )
+
+
+def _unsplash(photo_id: str) -> str:
+    return f"https://images.unsplash.com/{photo_id}?auto=format&fit=crop&w=600&q=80"
+
+
+# Deterministic product photography: one matching photo per catalog item, so
+# the image always depicts what the name and caption describe. Photo IDs are
+# the same ones used by the frontend mock catalog.
+ITEM_IMAGES: dict[str, str] = {
+    # Apparel
+    "Linen Shirt": _unsplash("photo-1598033129183-c4f50c736f10"),
+    "Summer Dress": _unsplash("photo-1598033129183-c4f50c736f10"),
+    "Co-ord Set": _unsplash("photo-1544441893-675973e31985"),
+    "Denim Jacket": _unsplash("photo-1544441893-675973e31985"),
+    "Relaxed Trousers": _unsplash("photo-1544441893-675973e31985"),
+    "Knit Sweater": _unsplash("photo-1601924994987-69e26d50dc26"),
+    # Footwear (closest available product photography)
+    "Everyday Sneakers": _unsplash("photo-1544441893-675973e31985"),
+    "Running Shoes": _unsplash("photo-1544441893-675973e31985"),
+    "Leather Loafers": _unsplash("photo-1544441893-675973e31985"),
+    "Canvas Slip-ons": _unsplash("photo-1544441893-675973e31985"),
+    "Strappy Sandals": _unsplash("photo-1544441893-675973e31985"),
+    "Ankle Boots": _unsplash("photo-1544441893-675973e31985"),
+    # Home & Living
+    "Ceramic Table Lamp": _unsplash("photo-1507652313519-d4e9174996dd"),
+    "Scented Candle Set": _unsplash("photo-1507652313519-d4e9174996dd"),
+    "Wall Mirror": _unsplash("photo-1615529182904-14819c35db37"),
+    "Throw Blanket": _unsplash("photo-1584100936595-c0654b55a2e2"),
+    "Cushion Cover": _unsplash("photo-1584100936595-c0654b55a2e2"),
+    "Cotton Dhurrie": _unsplash("photo-1584100936595-c0654b55a2e2"),
+    # Beauty
+    "Skincare Set": _unsplash("photo-1630019852942-f89202989a59"),
+    "Face Serum": _unsplash("photo-1630019852942-f89202989a59"),
+    "Clay Mask Kit": _unsplash("photo-1630019852942-f89202989a59"),
+    "Bath Salt Trio": _unsplash("photo-1578749556568-bc2c40e68b61"),
+    "Hand Cream Duo": _unsplash("photo-1578749556568-bc2c40e68b61"),
+    "Lip Balm Set": _unsplash("photo-1578749556568-bc2c40e68b61"),
+    # Kitchen
+    "Chai Kulhar Set": _unsplash("photo-1578749556568-bc2c40e68b61"),
+    "Dinner Plates": _unsplash("photo-1578749556568-bc2c40e68b61"),
+    "Storage Jar Set": _unsplash("photo-1535632066927-ab7c9ab60908"),
+    "Serving Tray": _unsplash("photo-1584308666744-24d5c474f2ae"),
+    "Copper Bottle": _unsplash("photo-1584308666744-24d5c474f2ae"),
+    "Cast Iron Skillet": _unsplash("photo-1584308666744-24d5c474f2ae"),
+    # Accessories
+    "Canvas Tote": _unsplash("photo-1566150905458-1bf1fc113f0d"),
+    "Day Backpack": _unsplash("photo-1566150905458-1bf1fc113f0d"),
+    "Leather Belt": _unsplash("photo-1566150905458-1bf1fc113f0d"),
+    "Cotton Cap": _unsplash("photo-1566150905458-1bf1fc113f0d"),
+    "Sunglasses": _unsplash("photo-1566150905458-1bf1fc113f0d"),
+    "Silk Scarf": _unsplash("photo-1601924994987-69e26d50dc26"),
+}
 
 
 def build_products() -> list[Product]:
@@ -143,13 +196,11 @@ def build_products() -> list[Product]:
         material = random.choice(spec["materials"])
         color = random.choice(COLORS)
         occasion = random.choice(spec["occasions"])
-        price = round(random.uniform(*spec["price"]), 2)
+        low, high = spec["price"]
+        # Weight prices toward the low end so monthly revenue stays realistic.
+        price = round(random.triangular(low, high, low + (high - low) * 0.15), 2)
 
-        name_prefix = f"{color} {material}"
-        if category in {"Home Decor", "Kitchen", "Bedding", "Lighting", "Rugs"}:
-            name = f"{name_prefix} {item}"
-        else:
-            name = f"{name_prefix} {item}"
+        name = f"{color} {item}"
 
         products.append(
             Product(
@@ -158,7 +209,7 @@ def build_products() -> list[Product]:
                 description=_description(color, material, item, occasion),
                 price=price,
                 color=color,
-                image_url=f"https://picsum.photos/seed/bellwether{i}/600/600",
+                image_url=ITEM_IMAGES.get(item, _unsplash("photo-1598033129183-c4f50c736f10")),
                 stock=random.randint(0, 120),
             )
         )
@@ -191,29 +242,54 @@ def assign_stock_and_popularity(products: list[Product]) -> dict[int, float]:
 def build_sales(
     products: list[Product], weights: dict[int, float]
 ) -> list[SalesRecord]:
-    """Generate sales rows weighted toward popular products."""
+    """Generate sales rows grouped into baskets (2-4 lines per order)."""
     ids = [p.id for p in products if p.id is not None]
     weight_values = [weights[i] for i in ids]
     price_by_id = {p.id: p.price for p in products if p.id is not None}
 
     today = date.today()
     records: list[SalesRecord] = []
-    for _ in range(TARGET_SALES):
-        product_id = random.choices(ids, weights=weight_values, k=1)[0]
+    order_id = 0
+    while len(records) < TARGET_SALES:
+        order_id += 1
+        lines = random.choices([2, 3, 4], weights=[50, 30, 20], k=1)[0]
         days_ago = random.randint(0, DAYS_OF_HISTORY - 1)
         sale_date = today - timedelta(days=days_ago)
-        quantity = random.choices([1, 2, 3, 4, 5], weights=[50, 25, 13, 7, 5], k=1)[0]
-        discount = random.choice([1.0, 1.0, 1.0, 0.9, 0.85, 0.75])
-        revenue = round(price_by_id[product_id] * quantity * discount, 2)
-        records.append(
-            SalesRecord(
-                product_id=product_id,
-                quantity=quantity,
-                sale_date=sale_date,
-                revenue=revenue,
+        for _ in range(lines):
+            if len(records) >= TARGET_SALES:
+                break
+            product_id = random.choices(ids, weights=weight_values, k=1)[0]
+            quantity = random.choices([1, 2, 3], weights=[72, 20, 8], k=1)[0]
+            discount = random.choice([1.0, 1.0, 1.0, 0.9, 0.85])
+            revenue = round(price_by_id[product_id] * quantity * discount, 2)
+            records.append(
+                SalesRecord(
+                    product_id=product_id,
+                    quantity=quantity,
+                    sale_date=sale_date,
+                    revenue=revenue,
+                    order_id=order_id,
+                )
+            )
+    return records
+
+
+def build_customers(count: int = 120) -> list[Customer]:
+    """Generate customers spread across the three personas."""
+    persona_ids = [p["id"] for p in PERSONAS]
+    customers = []
+    for i in range(count):
+        name = CUSTOMER_NAMES[i % len(CUSTOMER_NAMES)]
+        if i >= len(CUSTOMER_NAMES):
+            name = f"{name} {i // len(CUSTOMER_NAMES) + 1}"
+        customers.append(
+            Customer(
+                name=name,
+                persona=random.choice(persona_ids),
+                city=random.choice(CUSTOMER_CITIES),
             )
         )
-    return records
+    return customers
 
 
 def main() -> None:
@@ -226,6 +302,8 @@ def main() -> None:
 
     product_repo = SqliteProductRepository(db_path)
     sales_repo = SqliteSalesRepository(db_path)
+    customer_repo = SqliteCustomerRepository(db_path)
+    persona_repo = SqlitePersonaRepository(db_path)
 
     products = build_products()
     for product in products:
@@ -239,8 +317,15 @@ def main() -> None:
     sales = build_sales(products, weights)
     sales_repo.add_many(sales)
 
+    for spec in PERSONAS:
+        persona_repo.upsert(Persona(**spec))
+    customers = build_customers()
+    customer_repo.add_many(customers)
+
     print(f"Inserted {product_repo.count()} products.")
     print(f"Inserted {sales_repo.count()} sales rows.")
+    print(f"Inserted {customer_repo.count()} customers.")
+    print(f"Inserted {len(persona_repo.list())} personas.")
 
 
 if __name__ == "__main__":

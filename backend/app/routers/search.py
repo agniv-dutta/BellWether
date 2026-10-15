@@ -18,6 +18,7 @@ from fastapi import (
 from pydantic import BaseModel, Field
 
 from app.models.product import Product, ScoredProduct
+from app.repositories import get_search_event_repository
 from app.services.gemini_service import GeminiServiceError
 from app.services.search_service import SearchService, get_search_service
 from app.services.visual_search_service import (
@@ -54,6 +55,9 @@ class SearchResultItem(BaseModel):
     stock: int
     score: float
 
+    boosted: bool = False
+    note: str = ""
+
     @classmethod
     def from_scored(cls, scored: ScoredProduct) -> "SearchResultItem":
         product: Product = scored.product
@@ -67,6 +71,8 @@ class SearchResultItem(BaseModel):
             image_url=product.image_url,
             stock=product.stock,
             score=round(scored.score, 4),
+            boosted=scored.boosted,
+            note=scored.note,
         )
 
 
@@ -80,18 +86,40 @@ def _get_service() -> SearchService:
     return get_search_service()
 
 
+def _log_search_event(
+    query: str,
+    mode: str,
+    results: list,
+    persona_id: str = "",
+) -> None:
+    """Log a Demand Radar event. Never breaks the request."""
+    try:
+        top_score = max((item.score for item in results), default=0.0)
+        get_search_event_repository().log(
+            query=query,
+            mode=mode,
+            result_count=len(results),
+            top_score=float(top_score),
+            persona_id=persona_id or "",
+        )
+    except Exception:  # noqa: BLE001 - logging is best-effort
+        logger.exception("Failed to log search event.")
+
+
 @router.get("", response_model=SearchResponse)
 def semantic_search(
     q: str = Query(..., min_length=1, description="Natural-language query."),
     category: str | None = Query(None, description="Optional category filter."),
     max_price: float | None = Query(None, ge=0, description="Optional max price."),
     limit: int = Query(10, ge=1, le=50, description="Number of results."),
+    persona_id: str | None = Query(None, description="Optional persona for re-ranking."),
     service: SearchService = Depends(_get_service),
 ) -> SearchResponse:
     """Rank the catalog by semantic similarity to ``q``."""
     try:
         scored = service.semantic_search(
-            q, top_k=limit, category=category, max_price=max_price
+            q, top_k=limit, category=category, max_price=max_price,
+            persona_id=persona_id,
         )
     except GeminiServiceError as exc:
         logger.exception("Semantic search failed")
@@ -101,6 +129,7 @@ def semantic_search(
         ) from exc
 
     results = [SearchResultItem.from_scored(item) for item in scored]
+    _log_search_event(q, "text", scored, persona_id or "")
     return SearchResponse(query=q, count=len(results), results=results)
 
 
@@ -108,13 +137,14 @@ def semantic_search(
 # Visual search
 # --------------------------------------------------------------------------- #
 class VisualResultItem(SearchResultItem):
-    explanation: str = ""
+    match_reason: str = ""
 
 
 class VisualSearchResponse(BaseModel):
     attributes: StyleAttributes
     count: int
     results: list[VisualResultItem]
+    explanations: dict[str, str] = Field(default_factory=dict)
 
 
 def _get_visual_service() -> VisualSearchService:
@@ -136,6 +166,7 @@ async def visual_search(
     image: UploadFile = File(..., description="Product image (max 5 MB)."),
     hint: str | None = Form(None, description="Optional text hint."),
     limit: int = Form(10, ge=1, le=30, description="Number of matches."),
+    persona_id: str | None = Form(None, description="Optional persona for re-ranking."),
     service: VisualSearchService = Depends(_get_visual_service),
 ) -> VisualSearchResponse:
     """Find catalog products that match an uploaded image."""
@@ -159,7 +190,7 @@ async def visual_search(
 
     try:
         result: VisualSearchResult = service.search_by_image(
-            data, mime_type, hint=hint, limit=limit
+            data, mime_type, hint=hint, limit=limit, persona_id=persona_id
         )
     except GeminiServiceError as exc:
         logger.exception("Visual search failed")
@@ -168,13 +199,20 @@ async def visual_search(
             detail=f"Visual search backend error: {exc}",
         ) from exc
 
+    _log_search_event(hint or "photo search", "visual", result.results, persona_id or "")
     results = [
         VisualResultItem(
             **SearchResultItem.from_scored(item).model_dump(),
-            explanation=result.explanations.get(item.product.id or 0, ""),
+            match_reason=result.explanations.get(item.product.id or 0, ""),
         )
         for item in result.results
     ]
+    explanations = {
+        str(product_id): text for product_id, text in result.explanations.items()
+    }
     return VisualSearchResponse(
-        attributes=result.attributes, count=len(results), results=results
+        attributes=result.attributes,
+        count=len(results),
+        results=results,
+        explanations=explanations,
     )

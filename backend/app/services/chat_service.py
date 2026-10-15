@@ -28,11 +28,18 @@ MAX_HISTORY_TURNS = 20
 
 SYSTEM_PROMPT = (
     "You are BellWether, a friendly and helpful shopping assistant for an online "
-    "store selling fashion, accessories and home goods. "
+    "general retail store selling apparel, footwear, home & living, beauty, "
+    "kitchen and accessories. "
     "IMPORTANT: Never invent or guess products, prices or stock levels. Only ever "
     "recommend items that are returned by the search_products or get_product tools. "
     "If a tool returns no matches, say so honestly and suggest a different search. "
-    "Keep replies concise and conversational."
+    "REPLY FORMAT (follow exactly): write in plain text only - never use markdown, "
+    "asterisks (*), hashes (#), underscores, dashes or numbered lists. Mention each "
+    "recommended product by its EXACT full name as returned by the tools, at most 3 "
+    "products. Do NOT write prices, categories in parentheses, or stock counts in "
+    "your reply - product cards shown alongside your reply already display the "
+    "image, name and price. Structure: 1-2 sentences describing the picks, then one "
+    "short closing question. Keep the whole reply under 60 words."
 )
 
 
@@ -40,10 +47,12 @@ class ProductSummary(BaseModel):
     id: int
     name: str
     category: str
+    description: str = ""
     price: float
     color: str
     image_url: str
     stock: int
+    note: str = ""
 
 
 class ChatResult(BaseModel):
@@ -66,6 +75,35 @@ def _product_summary(product: Product, score: Optional[float] = None) -> dict[st
     return summary
 
 
+def _filter_mentioned_to_reply(
+    reply: str, mentioned: dict[int, ProductSummary], limit: int = 3
+) -> list[ProductSummary]:
+    """Keep only products the reply actually names, in order of appearance.
+
+    The tool loop remembers every product returned by any tool call, which is
+    usually more than the reply describes. Showing all of them produces cards
+    that don't match the caption, so we sync the two: a product gets a card
+    only if its exact name (or, as a fallback, its distinctive last two words,
+    e.g. "Anarkali Kurta") appears in the reply. No match means no cards
+    rather than wrong cards.
+    """
+    text = reply.lower()
+    scored: list[tuple[int, ProductSummary]] = []
+    for product in mentioned.values():
+        name = product.name.lower()
+        pos = text.find(name)
+        if pos == -1:
+            # Fallback for lightly reworded names: match the item words.
+            words = name.split()
+            key = " ".join(words[-2:]) if len(words) >= 2 else name
+            pos = text.find(key)
+            if pos == -1:
+                continue
+        scored.append((pos, product))
+    scored.sort(key=lambda item: item[0])
+    return [product for _, product in scored[:limit]]
+
+
 class ShoppingTools:
     """Executes the tools the model can call."""
 
@@ -73,21 +111,25 @@ class ShoppingTools:
         self,
         search_service: SearchService,
         product_repo: ProductRepository,
+        persona_id: str = "",
     ) -> None:
         self.search_service = search_service
         self.product_repo = product_repo
+        self.persona_id = persona_id
         self.mentioned: dict[int, ProductSummary] = {}
 
-    def _remember(self, product: Product) -> None:
+    def _remember(self, product: Product, note: str = "") -> None:
         if product.id is not None:
             self.mentioned[product.id] = ProductSummary(
                 id=product.id,
                 name=product.name,
                 category=product.category,
+                description=product.description,
                 price=product.price,
                 color=product.color,
                 image_url=product.image_url,
                 stock=product.stock,
+                note=note,
             )
 
     def search_products(
@@ -97,12 +139,29 @@ class ShoppingTools:
         category: Optional[str] = None,
     ) -> dict[str, Any]:
         results: list[ScoredProduct] = self.search_service.semantic_search(
-            query, top_k=5, category=category, max_price=max_price
+            query, top_k=5, category=category, max_price=max_price,
+            persona_id=self.persona_id or None,
         )
         products = []
         for scored in results:
-            self._remember(scored.product)
-            products.append(_product_summary(scored.product, scored.score))
+            self._remember(scored.product, note=scored.note)
+            summary = _product_summary(scored.product, scored.score)
+            if scored.note:
+                summary["note"] = scored.note
+            products.append(summary)
+        try:
+            from app.repositories import get_search_event_repository
+
+            top_score = max((r.score for r in results), default=0.0)
+            get_search_event_repository().log(
+                query=query,
+                mode="chat",
+                result_count=len(results),
+                top_score=float(top_score),
+                persona_id=self.persona_id,
+            )
+        except Exception:  # noqa: BLE001 - logging is best-effort
+            logger.exception("Failed to log chat search event.")
         return {"count": len(products), "products": products}
 
     def get_product(self, id: int) -> dict[str, Any]:
@@ -161,7 +220,7 @@ def _build_tools() -> types.Tool:
                         ),
                         "max_price": types.Schema(
                             type=types.Type.NUMBER,
-                            description="Optional maximum price in USD.",
+                            description="Optional maximum price in Indian rupees (INR).",
                         ),
                         "category": types.Schema(
                             type=types.Type.STRING,
@@ -231,9 +290,13 @@ class ChatService:
     def _history(self, session_id: str) -> list[types.Content]:
         return self._sessions.setdefault(session_id, [])
 
-    def chat(self, session_id: str, message: str) -> ChatResult:
+    def chat(
+        self, session_id: str, message: str, persona_id: str = ""
+    ) -> ChatResult:
         """Run one user turn through the tool-execution loop."""
-        executor = ShoppingTools(self.search_service, self.product_repo)
+        executor = ShoppingTools(
+            self.search_service, self.product_repo, persona_id=persona_id
+        )
 
         with self._lock:
             history = self._history(session_id)
@@ -285,7 +348,10 @@ class ChatService:
                 del history[:-MAX_HISTORY_TURNS]
 
         return ChatResult(
-            reply=reply, products_mentioned=list(executor.mentioned.values())
+            reply=reply,
+            products_mentioned=_filter_mentioned_to_reply(
+                reply, executor.mentioned
+            ),
         )
 
 

@@ -22,6 +22,7 @@ router = APIRouter(prefix="/api", tags=["chat"])
 class ChatRequest(BaseModel):
     session_id: str = Field(..., min_length=1, max_length=128)
     message: str = Field(..., min_length=1, max_length=2000)
+    persona_id: str = Field(default="", max_length=64)
 
 
 class ChatResponse(BaseModel):
@@ -40,7 +41,9 @@ def chat(
 ) -> ChatResponse:
     """Continue a shopping conversation, executing tools as needed."""
     try:
-        result = service.chat(payload.session_id, payload.message)
+        result = service.chat(
+            payload.session_id, payload.message, payload.persona_id
+        )
     except GeminiServiceError as exc:
         logger.exception("Chat failed")
         raise HTTPException(

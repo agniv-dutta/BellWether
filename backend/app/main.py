@@ -6,7 +6,9 @@ Run locally with::
 """
 
 import logging
+import time
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,9 +16,13 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.middleware import RateLimitMiddleware, RequestLoggingMiddleware
-from app.routers import chat, merchant, search
+from app.routers import chat, merchant, products, search
 
 logger = logging.getLogger(__name__)
+
+# Cache for the cheap Gemini latency probe behind /health (60s TTL).
+_health_probe: dict[str, float | Optional[float]] = {"at": 0.0, "latency": None}
+_HEALTH_PROBE_TTL = 60.0
 
 
 @asynccontextmanager
@@ -67,15 +73,42 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 app.include_router(search.router)
 app.include_router(chat.router)
 app.include_router(merchant.router)
+app.include_router(products.router)
+
+
+def _gemini_latency_ms() -> Optional[float]:
+    """Cheap latency probe, cached for 60s. ``None`` when unreachable."""
+    now = time.monotonic()
+    if now - float(_health_probe["at"]) < _HEALTH_PROBE_TTL:
+        latency = _health_probe["latency"]
+        return float(latency) if latency is not None else None
+    latency: Optional[float] = None
+    try:
+        from app.services.gemini_service import get_gemini_service
+
+        service = get_gemini_service()
+        credentials_present = (
+            service.backend == "vertex"
+            or settings.api_key_configured
+        )
+        if credentials_present:
+            start = time.monotonic()
+            service.generate_text("Reply with exactly: ok", max_retries=0)
+            latency = round((time.monotonic() - start) * 1000, 1)
+    except Exception:  # noqa: BLE001 - health must never fail
+        logger.warning("Health latency probe failed.", exc_info=True)
+    _health_probe["at"] = now
+    _health_probe["latency"] = latency
+    return latency
 
 
 @app.get("/health", tags=["system"])
-async def health() -> dict[str, str]:
-    """Liveness probe."""
+async def health() -> dict[str, object]:
+    """Liveness probe with backend identity and cached model latency."""
+    service_backend = settings.gemini_backend.lower()
     return {
         "status": "ok",
-        "project": settings.project,
-        "location": settings.location,
-        "chat_model": settings.gemini_model,
-        "embedding_model": settings.embedding_model,
+        "backend": service_backend,
+        "model": settings.gemini_model,
+        "latency_ms": _gemini_latency_ms(),
     }

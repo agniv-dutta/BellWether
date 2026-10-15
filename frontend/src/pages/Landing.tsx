@@ -1,11 +1,12 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform, useReducedMotion, type Variants } from 'framer-motion';
-import { ShoppingBag, Store, Search, Camera, MessageCircle, ArrowRight, Eye, Lightbulb, Gem } from 'lucide-react';
+import { ShoppingBag, Store, Search, Camera, MessageCircle, ArrowRight, Lightbulb, TrendingUp } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { SectionHeading } from '../components/ui/SectionHeading';
 import { Card } from '../components/ui/Card';
 import { Marquee } from '../components/ui/Marquee';
+import { BRAND, MARQUEE_PHRASES } from '../lib/brand';
 
 const fadeInUp: Variants = {
   hidden: { opacity: 0, y: 40 },
@@ -13,30 +14,44 @@ const fadeInUp: Variants = {
 };
 
 const stagger: Variants = {
-  visible: { transition: { staggerChildren: 0.15 } },
+  visible: { transition: { staggerChildren: 0.06 } },
 };
 
-const heroImages = [
-  'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1601924994987-69e26d50dc26?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1630019852942-f89202989a59?auto=format&fit=crop&w=600&q=80',
+const marqueeItems = [...MARQUEE_PHRASES];
+
+const heroArches = [
+  {
+    src: 'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?auto=format&fit=crop&w=600&q=80',
+    alt: 'Relaxed apparel on a rail',
+    height: 'h-[360px]',
+    yOff: 0,
+  },
+  {
+    src: 'https://images.unsplash.com/photo-1507652313519-d4e9174996dd?auto=format&fit=crop&w=600&q=80',
+    alt: 'Warm home light',
+    height: 'h-[420px]',
+    yOff: -36,
+  },
+  {
+    src: 'https://images.unsplash.com/photo-1566150905458-1bf1fc113f0d?auto=format&fit=crop&w=600&q=80',
+    alt: 'Everyday carry accessories',
+    height: 'h-[340px]',
+    yOff: -12,
+  },
 ];
 
-const marqueeItems = [
-  'a saree the colour of monsoon dusk',
-  'linen shirt, relaxed fit',
-  'something for a quiet wedding',
-  'terracotta planter, handmade',
-  'earrings that catch the light just so',
-  'a throw blanket in warm peach',
-  'brass bowl for floating marigolds',
+const loopNodes = [
+  { title: 'Shopper asks', desc: 'A photo, a few words, a feeling — even for things you don\u2019t stock.' },
+  { title: 'BellWether listens', desc: 'Every search and chat becomes a signal, misses included.' },
+  { title: 'Merchant decides', desc: 'Demand Radar turns misses into restocking actions.' },
+  { title: 'Shelf gets better', desc: 'What shoppers wanted shows up on the shelves.' },
 ];
 
 export const Landing: React.FC = () => {
   const prefersReduced = useReducedMotion();
   const heroRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
-  const heroY = useTransform(scrollYProgress, [0, 1], [0, -80]);
+  const heroY = useTransform(scrollYProgress, [0, 1], [0, -60]);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -54,7 +69,7 @@ export const Landing: React.FC = () => {
       <section ref={heroRef} className="relative min-h-screen flex items-center mesh-hero grain">
         <motion.div
           style={{ y: prefersReduced ? 0 : heroY }}
-          className="w-full max-w-7xl mx-auto px-6 py-20 grid lg:grid-cols-2 gap-12 lg:gap-20 items-center"
+          className="w-full max-w-7xl mx-auto px-6 py-20 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center"
         >
           {/* Left: Copy */}
           <motion.div
@@ -67,24 +82,22 @@ export const Landing: React.FC = () => {
               variants={fadeInUp}
               className="inline-block font-mono text-xs uppercase tracking-[0.2em] text-hibiscus bg-hibiscus/10 px-4 py-1.5 rounded-full border border-hibiscus/20"
             >
-              BellWether
+              {BRAND.name} · {BRAND.descriptor}
             </motion.span>
 
             <motion.h1
               variants={fadeInUp}
-              className="text-display text-5xl sm:text-6xl md:text-7xl lg:text-[5.5rem] leading-[0.95] text-oxblood"
-              style={{ fontSize: 'clamp(3rem, 7vw, 5.5rem)' }}
+              className="font-serif text-oxblood leading-[1.02]"
+              style={{ fontSize: 'clamp(3rem, 7vw, 5.5rem)', letterSpacing: '-0.02em' }}
             >
-              An eye for what's worth it.
+              {BRAND.tagline}
             </motion.h1>
 
             <motion.p
               variants={fadeInUp}
               className="text-lg sm:text-xl text-oxblood/80 max-w-lg leading-relaxed"
             >
-              Show us what you love — a photo, a feeling, a few words — and we'll
-              find the pieces that belong with it. For merchants, your store speaks
-              for itself.
+              {BRAND.subline}
             </motion.p>
 
             <motion.div variants={fadeInUp} className="flex flex-wrap gap-4 pt-2">
@@ -103,69 +116,57 @@ export const Landing: React.FC = () => {
             </motion.div>
           </motion.div>
 
-          {/* Right: Arch Images */}
+          {/* Right: Arch Images + signal card */}
           <motion.div
             initial="hidden"
             animate="visible"
             variants={stagger}
-            className="relative hidden lg:flex items-end justify-center gap-6 min-h-[500px]"
+            className="relative hidden lg:flex items-end justify-center gap-5 min-h-[480px]"
+            style={
+              prefersReduced
+                ? {}
+                : { x: mousePos.x * 0.008, y: mousePos.y * 0.008 }
+            }
           >
-            {heroImages.map((src, idx) => {
-              const offsets = [
-                { rotate: -4, yOff: 0, height: 'h-[380px]' },
-                { rotate: 2, yOff: -40, height: 'h-[430px]' },
-                { rotate: -2, yOff: -15, height: 'h-[360px]' },
-              ];
-              const { rotate, yOff, height } = offsets[idx];
+            {heroArches.map((arch, idx) => (
+              <motion.div
+                key={idx}
+                variants={fadeInUp}
+                className={`relative ${arch.height} w-[160px] flex-shrink-0`}
+              >
+                <div className="absolute -inset-1.5 rounded-[999px_999px_28px_28px] bg-gradient-to-b from-apricot/50 to-coral/30" />
+                <div className="relative arch overflow-hidden h-full w-full shadow-oxblood-md bg-blush photo-warm-wrap">
+                  <img
+                    src={arch.src}
+                    alt={arch.alt}
+                    className="w-full h-full object-cover photo-warm"
+                    loading="eager"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-oxblood/30 via-transparent to-transparent" />
+                </div>
+              </motion.div>
+            ))}
 
-              return (
-                <motion.div
-                  key={idx}
-                  variants={fadeInUp}
-                  animate={
-                    prefersReduced
-                      ? {}
-                      : {
-                          y: [yOff, yOff - 8, yOff],
-                        }
-                  }
-                  transition={{
-                    y: { repeat: Infinity, duration: 3 + idx * 0.7, ease: 'easeInOut' },
-                  }}
-                  className={`relative ${height} w-[160px] flex-shrink-0`}
-                  style={{ transform: `rotate(${rotate}deg)` }}
-                >
-                  <div className="absolute -inset-1.5 rounded-[999px_999px_28px_28px] bg-gradient-to-b from-apricot/50 to-coral/30" />
-                  <div className="relative arch overflow-hidden h-full w-full shadow-oxblood-md bg-blush">
-                    <img
-                      src={src}
-                      alt={`Featured product ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                      loading="eager"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-oxblood/30 via-transparent to-transparent" />
-                  </div>
-                </motion.div>
-              );
-            })}
-
-            {/* Loupe ring */}
+            {/* Floating signal card */}
             <motion.div
-              className="absolute pointer-events-none z-20"
-              animate={
-                prefersReduced
-                  ? {}
-                  : {
-                      x: mousePos.x * 0.02 - 30,
-                      y: mousePos.y * 0.02 - 30,
-                    }
-              }
-              transition={{ type: 'spring', stiffness: 50, damping: 20 }}
-              style={{ top: '30%', right: '10%' }}
+              variants={fadeInUp}
+              className="absolute -bottom-2 left-2 z-20 bg-paper border border-apricot/50 rounded-2xl shadow-oxblood-md px-4 py-3 w-64"
             >
-              <div className="w-24 h-24 rounded-full border-4 border-persimmon/70 bg-persimmon/10 shadow-oxblood-md flex items-center justify-center">
-                <Search className="w-8 h-8 text-persimmon/80" />
-              </div>
+              <p className="text-[11px] font-mono uppercase tracking-wider text-hibiscus flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5" /> Rising now
+              </p>
+              <p className="font-serif text-base text-oxblood leading-snug mt-1">
+                Linen co-ord sets, up 38% this week — 0 in stock
+              </p>
+              <svg viewBox="0 0 120 28" className="w-full h-7 mt-1" aria-hidden="true">
+                <polyline
+                  points="0,24 15,22 30,23 45,18 60,19 75,12 90,13 105,6 120,4"
+                  fill="none"
+                  stroke="#F4552F"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+              </svg>
             </motion.div>
           </motion.div>
         </motion.div>
@@ -174,8 +175,50 @@ export const Landing: React.FC = () => {
       {/* =========== MARQUEE =========== */}
       <Marquee items={marqueeItems} speed={30} />
 
+      {/* =========== ONE LOOP =========== */}
+      <section className="py-20 sm:py-[120px] px-6 bg-paper border-y border-oxblood/10">
+        <div className="max-w-7xl mx-auto">
+          <SectionHeading
+            eyebrow="One loop"
+            title="From a want to a shelf."
+            subtitle="Everyone built a shopper assistant or a merchant assistant. We built the loop between them."
+            align="center"
+            className="mb-14"
+          />
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.3 }}
+            variants={stagger}
+            className="relative grid sm:grid-cols-2 lg:grid-cols-4 gap-6"
+          >
+            <motion.div
+              className="hidden lg:block absolute top-8 left-[12%] right-[12%] h-[2px] bg-blush overflow-hidden"
+              aria-hidden="true"
+            >
+              <motion.div
+                initial={{ scaleX: 0 }}
+                whileInView={{ scaleX: 1 }}
+                viewport={{ once: true, amount: 0.5 }}
+                transition={{ duration: 1.2, ease: 'easeOut' }}
+                className="h-full w-full bg-persimmon origin-left"
+              />
+            </motion.div>
+            {loopNodes.map((node, i) => (
+              <motion.div key={node.title} variants={fadeInUp} className="relative text-center space-y-3 px-2">
+                <span className="relative z-10 w-16 h-16 mx-auto arch bg-blush border border-apricot/50 flex items-center justify-center font-serif text-xl text-persimmon">
+                  {i + 1}
+                </span>
+                <h3 className="font-serif text-xl text-oxblood">{node.title}</h3>
+                <p className="text-oxblood/75 text-sm leading-relaxed">{node.desc}</p>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
       {/* =========== TWO SIDES =========== */}
-      <section className="bg-blush/50 py-20 sm:py-28 px-6">
+      <section className="bg-blush/50 py-20 sm:py-[120px] px-6">
         <div className="max-w-6xl mx-auto">
           <motion.div
             initial="hidden"
@@ -225,16 +268,16 @@ export const Landing: React.FC = () => {
                 </div>
                 <h3 className="font-serif text-3xl text-oxblood">For merchants</h3>
                 <p className="text-oxblood/80 leading-relaxed">
-                  Ask your store anything in plain English. Stock alerts find
-                  problems before you do. The SQL is always visible — no black
-                  boxes, just clarity.
+                  Ask your store anything in plain English. Demand Radar surfaces
+                  what shoppers asked for and you don't stock — before the sales
+                  data ever could. The SQL is always visible.
                 </p>
                 <div className="flex flex-wrap gap-2 pt-2">
                   <span className="flex items-center gap-1.5 text-xs font-mono bg-blush px-3 py-1 rounded-full text-oxblood/80">
                     <MessageCircle className="w-3.5 h-3.5 text-hibiscus" /> NL → SQL
                   </span>
                   <span className="flex items-center gap-1.5 text-xs font-mono bg-blush px-3 py-1 rounded-full text-oxblood/80">
-                    <Lightbulb className="w-3.5 h-3.5 text-hibiscus" /> Smart Alerts
+                    <Lightbulb className="w-3.5 h-3.5 text-hibiscus" /> Demand Radar
                   </span>
                 </div>
                 <Link
@@ -250,48 +293,8 @@ export const Landing: React.FC = () => {
         </div>
       </section>
 
-      {/* =========== HOW IT WORKS =========== */}
-      <section className="py-20 sm:py-28 px-6 bg-paper">
-        <div className="max-w-5xl mx-auto">
-          <SectionHeading
-            eyebrow="How it works"
-            title="Three moments, one intent."
-            align="center"
-            className="mb-16"
-          />
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.3 }}
-            variants={stagger}
-            className="grid md:grid-cols-3 gap-12"
-          >
-            {[
-              { num: '01', icon: Eye, title: 'Show it', desc: 'Upload a photo, paste a link, or describe the feeling you want.' },
-              { num: '02', icon: Lightbulb, title: 'Understand it', desc: 'Our models parse colour, texture, occasion, and vibe — not just keywords.' },
-              { num: '03', icon: Gem, title: 'Find it', desc: 'Results ranked by how well they match what you actually meant.' },
-            ].map((step) => (
-              <motion.div
-                key={step.num}
-                variants={fadeInUp}
-                className="text-center space-y-4 group"
-              >
-                <span className="text-display text-7xl sm:text-8xl text-apricot/60 group-hover:text-persimmon/40 transition-colors leading-none">
-                  {step.num}
-                </span>
-                <div className="w-14 h-14 mx-auto rounded-2xl bg-persimmon/10 flex items-center justify-center group-hover:bg-persimmon/20 transition-colors">
-                  <step.icon className="w-7 h-7 text-persimmon" />
-                </div>
-                <h3 className="font-serif text-2xl text-oxblood">{step.title}</h3>
-                <p className="text-oxblood/75 text-sm max-w-xs mx-auto leading-relaxed">{step.desc}</p>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
       {/* =========== PROBLEM TEASER =========== */}
-      <section className="bg-oxblood py-20 sm:py-28 px-6">
+      <section className="bg-oxblood py-20 sm:py-[120px] px-6">
         <motion.div
           initial="hidden"
           whileInView="visible"
@@ -303,7 +306,8 @@ export const Landing: React.FC = () => {
             variants={fadeInUp}
             className="font-serif text-3xl sm:text-5xl text-paper/95 leading-tight italic"
           >
-            "A customer walks in knowing exactly what they want —<br className="hidden sm:inline" />
+            "A customer walks in knowing exactly what they want —
+            <br className="hidden sm:inline" />
             but they can't describe it in your filter menu."
           </motion.blockquote>
           <motion.p
@@ -311,7 +315,8 @@ export const Landing: React.FC = () => {
             className="text-paper/70 text-base sm:text-lg max-w-xl mx-auto"
           >
             That gap between human intention and machine understanding is where
-            retail loses its best conversations. We're closing it.
+            retail loses its best conversations. We're closing it — on both sides
+            of the counter.
           </motion.p>
           <motion.div variants={fadeInUp}>
             <Link to="/problem">

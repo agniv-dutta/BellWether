@@ -1,9 +1,8 @@
 """Application configuration loaded from environment variables.
 
 All configuration is provided via environment variables (optionally a ``.env``
-file) and parsed with pydantic-settings. Nothing is hardcoded: project IDs,
-locations, model names and the database path can all be swapped without code
-changes.
+file) and parsed with pydantic-settings. Nothing is hardcoded: the API key,
+model names and the database path can all be swapped without code changes.
 """
 
 from functools import lru_cache
@@ -21,8 +20,14 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Google Cloud / Vertex AI
-    google_cloud_project: str = "your-project-id"
+    # Gemini backend: "api" (Google AI Studio key) or "vertex" (GCP project).
+    gemini_backend: str = "api"
+
+    # Gemini API (Google AI Studio). Get a key at https://aistudio.google.com/apikey
+    gemini_api_key: str = ""
+
+    # Only used when GEMINI_BACKEND=vertex.
+    google_cloud_project: str = ""
     google_cloud_location: str = "us-central1"
 
     # Model IDs (keep configurable so they can be swapped easily)
@@ -35,14 +40,13 @@ class Settings(BaseSettings):
     # Rate limiting on API endpoints (requests per minute, per client IP)
     rate_limit_per_minute: int = 30
 
-    # Convenience aliases used by the google-genai client.
-    @property
-    def project(self) -> str:
-        return self.google_cloud_project
+    # Demand Radar: a search is a "miss" when it returns nothing or the top
+    # score falls below this threshold.
+    demand_miss_threshold: float = 0.55
 
     @property
-    def location(self) -> str:
-        return self.google_cloud_location
+    def api_key_configured(self) -> bool:
+        return bool(self.gemini_api_key.strip())
 
 
 @lru_cache
